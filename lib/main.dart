@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:kakao_flutter_sdk_common/kakao_flutter_sdk_common.dart';
 import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
+import 'features/shell/home_shell.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,7 +42,7 @@ class _LoginPageState extends State<LoginPage> {
       _msg = '';
     });
     try {
-      final installed = await isKakaoTalkInstalled();
+      /*final installed = await isKakaoTalkInstalled();
       final token = installed
           ? await UserApi.instance.loginWithKakaoTalk()
           : await UserApi.instance.loginWithKakaoAccount();
@@ -54,7 +55,23 @@ class _LoginPageState extends State<LoginPage> {
       setState(() {
         _msg = '로그인 실패: $e';
       });
-    } finally {
+    }*/
+      // 테스트용: 바로 로그인 성공 처리
+      const fakeToken = 'TEST_ACCESS_TOKEN';
+      await Future.delayed(const Duration(milliseconds: 300));
+      if (!mounted) return;
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const HomeShell()),
+      );
+      setState(() {
+        _msg = '로그인 성공(테스트 모드) - $fakeToken';
+      });
+
+    } catch (e) {
+      setState(() {
+        _msg = '로그인 실패: $e';
+      });
+    }finally {
       if (mounted) {
         setState(() {
           _loading = false;
@@ -81,10 +98,10 @@ class _LoginPageState extends State<LoginPage> {
                     children: [
                       Image.asset(
                         'assets/molet.png',
-                        height: 140,
+                        height: 250,
                         fit: BoxFit.contain,
                       ),
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 11),
                       Text(
                         'DRIVE, PAY, DONE',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(

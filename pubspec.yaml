@@ -44,6 +44,7 @@ dependencies:
   kakao_map_plugin: ^0.3.7
   flutter_secure_storage: 9.2.4
   mobile_scanner: ^7.0.1
+  fl_chart: ^0.69.0
 
 dev_dependencies:
   flutter_test:

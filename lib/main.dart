@@ -1,11 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:kakao_flutter_sdk_common/kakao_flutter_sdk_common.dart';
 import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
-import 'features/shell/home_shell.dart';
+import 'package:kakao_map_plugin/kakao_map_plugin.dart';
+import 'features/home/home_shell.dart';
+import 'features/wallet/wallet_service.dart';
 
-void main() {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  KakaoSdk.init(nativeAppKey: const String.fromEnvironment('KAKAO_NATIVE_APP_KEY'));
+
+  // 지갑/거래내역 초기화 (앱 첫 화면 뜨기 전)
+  await WalletService.init();
+
+  // 하나의 환경변수로 통일해서 JS키 주입
+  const jsKey = String.fromEnvironment('KAKAO_JAVASCRIPT_APP_KEY');
+
+  KakaoSdk.init(
+    nativeAppKey: const String.fromEnvironment('KAKAO_NATIVE_APP_KEY'),
+    javaScriptAppKey: jsKey,
+  );
+
+  // kakao_map_plugin용 초기화 (JS 키 동일 사용)
+  AuthRepository.initialize(appKey: jsKey);
+
   runApp(const MoletApp());
 }
 
@@ -41,48 +57,48 @@ class _LoginPageState extends State<LoginPage> {
       _loading = true;
       _msg = '';
     });
+
     try {
-      /*final installed = await isKakaoTalkInstalled();
-      final token = installed
-          ? await UserApi.instance.loginWithKakaoTalk()
-          : await UserApi.instance.loginWithKakaoAccount();
+      OAuthToken token;
+      final installed = await isKakaoTalkInstalled();
 
-      // TODO: 여기서 백엔드로 카카오 토큰 전달 -> JWT 발급 (/api/auth/login)
-      setState(() {
-        _msg = '카카오 토큰 받음: ${token.accessToken.substring(0, 8)}...';
-      });
-    } catch (e) {
-      setState(() {
-        _msg = '로그인 실패: $e';
-      });
-    }*/
-      // 테스트용: 바로 로그인 성공 처리
-      const fakeToken = 'TEST_ACCESS_TOKEN';
-      await Future.delayed(const Duration(milliseconds: 300));
+      if (installed) {
+        try {
+          token = await UserApi.instance.loginWithKakaoTalk();
+        } catch (_) {
+          token = await UserApi.instance.loginWithKakaoAccount();
+        }
+      } else {
+        token = await UserApi.instance.loginWithKakaoAccount();
+      }
+
+      final me = await UserApi.instance.me();
+      final nick = me.kakaoAccount?.profile?.nickname ?? '사용자';
+
       if (!mounted) return;
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const HomeShell()),
-      );
       setState(() {
-        _msg = '로그인 성공(테스트 모드) - $fakeToken';
+        _msg = '로그인 성공: $nick (${token.accessToken.substring(0, 8)}...)';
       });
 
+      // TODO: 백엔드에 token.accessToken 전달해 JWT 발급/저장
+
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => HomeShell(displayName: nick)),
+      );
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _msg = '로그인 실패: $e';
       });
-    }finally {
+    } finally {
       if (mounted) {
-        setState(() {
-          _loading = false;
-        });
+        setState(() => _loading = false);
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // 화면 안전 영역 + 가운데 정렬 + 하단 버튼 고정
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -93,14 +109,9 @@ class _LoginPageState extends State<LoginPage> {
               child: Column(
                 children: [
                   const Spacer(),
-                  // 중앙 로고
                   Column(
                     children: [
-                      Image.asset(
-                        'assets/molet.png',
-                        height: 250,
-                        fit: BoxFit.contain,
-                      ),
+                      Image.asset('assets/molet.png', height: 250, fit: BoxFit.contain),
                       const SizedBox(height: 11),
                       Text(
                         'DRIVE, PAY, DONE',
@@ -112,7 +123,6 @@ class _LoginPageState extends State<LoginPage> {
                     ],
                   ),
                   const Spacer(),
-                  // 하단 카카오 로그인 버튼(이미지)
                   SizedBox(
                     width: double.infinity,
                     child: InkWell(
@@ -121,15 +131,10 @@ class _LoginPageState extends State<LoginPage> {
                       child: Stack(
                         alignment: Alignment.center,
                         children: [
-                          // 버튼 이미지
                           ClipRRect(
                             borderRadius: BorderRadius.circular(12),
-                            child: Image.asset(
-                              'assets/kakaologin.png',
-                              fit: BoxFit.contain,
-                            ),
+                            child: Image.asset('assets/kakaologin.png', fit: BoxFit.contain),
                           ),
-                          // 로딩 표시
                           if (_loading)
                             const Positioned.fill(
                               child: ColoredBox(
@@ -148,11 +153,7 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Text(
-                    _msg,
-                    textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
+                  Text(_msg, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodySmall),
                 ],
               ),
             ),

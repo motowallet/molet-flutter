@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import '../wallet/wallet_service.dart';
 
 class TransactionListPage extends StatefulWidget {
-  final List<Map<String, dynamic>> allTx;
   final String initialFilter; // 'all' | 'payment' | 'deposit' | 'withdraw'
   const TransactionListPage({
     super.key,
-    required this.allTx,
     this.initialFilter = 'all',
   });
 
@@ -15,11 +14,14 @@ class TransactionListPage extends StatefulWidget {
 }
 
 class _TransactionListPageState extends State<TransactionListPage> {
-  late String _filter = widget.initialFilter;
+  late String _filter;
   final _won = NumberFormat('#,###');
 
-  List<Map<String, dynamic>> get _list =>
-      widget.allTx.where((e) => _filter == 'all' ? true : e['type'] == _filter).toList();
+  @override
+  void initState() {
+    super.initState();
+    _filter = widget.initialFilter;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,31 +44,56 @@ class _TransactionListPageState extends State<TransactionListPage> {
                 ),
               ),
             ),
-            const Divider(height: 1),
+            const Divider(height: 1)
+
             Expanded(
-              child: ListView.separated(
-                itemCount: _list.length,
-                separatorBuilder: (_, __) => const Divider(height: 1),
-                itemBuilder: (_, i) {
-                  final it = _list[i];
-                  final amt = it['amount'] as int;
-                  return ListTile(
-                    title: Text(it['title'] as String),
-                    subtitle: Text(it['createdAt'] as String),
-                    leading: Icon(
-                      it['type'] == 'deposit'
-                          ? Icons.south_west
-                          : Icons.north_east,
-                      size: 20,
-                      color: it['type'] == 'deposit' ? Colors.green : Colors.redAccent,
-                    ),
-                    trailing: Text(
-                      '${amt < 0 ? '-' : '+'}${_won.format(amt.abs())}원',
-                      style: TextStyle(
-                        fontWeight: FontWeight.w700,
-                        color: amt < 0 ? Colors.redAccent : Colors.green,
-                      ),
-                    ),
+              child: ValueListenableBuilder<List<Map<String, dynamic>>>(
+                valueListenable: WalletService.txVN,
+                builder: (context, txs, _) {
+                  final items = txs.where((e) {
+                    final t = (e['type'] ?? '').toString();
+                    return _filter == 'all' ? true : t == _filter;
+                  }).toList();
+
+                  // 최신순
+                  items.sort((a, b) {
+                    final da = (a['createdAt'] ?? '').toString();
+                    final db = (b['createdAt'] ?? '').toString();
+                    return db.compareTo(da);
+                  });
+
+                  if (items.isEmpty) {
+                    return const Center(
+                      child: Text('내역이 없습니다', style: TextStyle(color: Colors.black54)),
+                    );
+                  }
+
+                  return ListView.separated(
+                    itemCount: items.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (_, i) {
+                      final it = items[i];
+                      final title = (it['title'] ?? '').toString();
+                      final date  = (it['createdAt'] ?? '').toString();
+                      final type  = (it['type'] ?? '').toString();
+                      final num rawAmt = (it['amount'] is num) ? it['amount'] as num : 0;
+                      final amt = rawAmt.toInt();
+                      final isIncome = type == 'deposit';
+                      final color = isIncome ? Colors.green : Colors.redAccent;
+
+                      return ListTile(
+                        title: Text(title.isEmpty ? '(제목 없음)' : title),
+                        subtitle: Text(date),
+                        leading: Icon(
+                          isIncome ? Icons.south_west : Icons.north_east,
+                          size: 20, color: color,
+                        ),
+                        trailing: Text(
+                          '${amt < 0 ? '-' : '+'}${_won.format(amt.abs())}원',
+                          style: TextStyle(fontWeight: FontWeight.w700, color: color),
+                        ),
+                      );
+                    },
                   );
                 },
               ),

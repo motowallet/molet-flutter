@@ -2,20 +2,75 @@ import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-class BudgetUsagePage extends StatelessWidget {
+class BudgetUsagePage extends StatefulWidget {
   const BudgetUsagePage({super.key});
 
   @override
+  State<BudgetUsagePage> createState() => _BudgetUsagePageState();
+}
+
+class _BudgetUsagePageState extends State<BudgetUsagePage> {
+  bool _loading = true;
+  int _total = 0; // 총 예산
+  int _used = 0;  // 이번 달 사용액
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  String _ym([DateTime? d]) {
+    final n = d ?? DateTime.now();
+    return '${n.year}${n.month.toString().padLeft(2, '0')}';
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    final sp = await SharedPreferences.getInstance();
+    final ym = _ym();
+
+    // BudgetLimitPage에서 저장해야 하는 키:
+    //   'budget_limit_YYYYMM'  (총 예산)
+    // WalletService.pay()/transfer()에서 누적해 둔 키:
+    //   'budget_used_YYYYMM'   (이번 달 사용액)
+    final total = sp.getInt('budget_limit_$ym') ?? 300000; // 기본값 30만
+    final used  = sp.getInt('budget_used_$ym')  ?? 0;
+
+    if (!mounted) return;
+    setState(() {
+      _total = total;
+      _used  = used.clamp(0, total); // total 없을 땐 그대로 표시하고 싶으면 이 줄 수정
+      _loading = false;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // 데이터
-    const total = 300000, usage = 0.79;
-    final used = (total * usage).toInt(), remaining = total - used;
+    if (_loading) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('예산 사용률 확인'), toolbarHeight: 48),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     final won = NumberFormat('#,###');
+    final total = _total;
+    final used = _used;
+    final remaining = (total > 0) ? (total - used).clamp(0, total) : 0;
+    final usage = (total > 0) ? (used / total).clamp(0.0, 1.0) : 0.0;
     final danger = usage >= .8;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('예산 사용률 확인'), toolbarHeight: 48),
+      appBar: AppBar(
+        title: const Text('예산 사용률 확인'),
+        toolbarHeight: 48,
+        actions: [
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
         child: Column(
@@ -33,9 +88,13 @@ class BudgetUsagePage extends StatelessWidget {
                     padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
                     decoration: const BoxDecoration(
                       gradient: LinearGradient(
-                          colors: [Color(0xFFEFF4FF), Color(0xFFF9FAFB)],
-                          begin: Alignment.topLeft, end: Alignment.bottomRight),
-                      boxShadow: [BoxShadow(color: Color(0x11000000), blurRadius: 14, offset: Offset(0, 8))],
+                        colors: [Color(0xFFEFF4FF), Color(0xFFF9FAFB)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      boxShadow: [
+                        BoxShadow(color: Color(0x11000000), blurRadius: 14, offset: Offset(0, 8)),
+                      ],
                     ),
                   ),
                   BackdropFilter(
@@ -49,15 +108,17 @@ class BudgetUsagePage extends StatelessWidget {
                         SizedBox(
                           height: 160,
                           child: TweenAnimationBuilder<double>(
-                            tween: Tween(begin: 0, end: usage.clamp(0, 1)),
+                            tween: Tween(begin: 0, end: usage),
                             duration: const Duration(milliseconds: 800),
                             curve: Curves.easeOutCubic,
                             builder: (_, v, __) => CustomPaint(
                               painter: _PrettySemiGaugePainter(
                                 progress: v,
                                 gradient: const LinearGradient(
-                                    colors: [Color(0xFF6EA8FF), Color(0xFF3E63FF)],
-                                    begin: Alignment.centerLeft, end: Alignment.centerRight),
+                                  colors: [Color(0xFF6EA8FF), Color(0xFF3E63FF)],
+                                  begin: Alignment.centerLeft,
+                                  end: Alignment.centerRight,
+                                ),
                               ),
                               child: Center(
                                 child: TweenAnimationBuilder<int>(
@@ -79,9 +140,8 @@ class BudgetUsagePage extends StatelessWidget {
                             ),
                           ),
                         ),
-                        const SizedBox(height: 70),
+                        const SizedBox(height: 40),
 
-                        // 세 줄(아이콘 + 라벨 + 값) + Divider
                         _infoRow(
                           icon: Icons.trending_up,
                           iconBg: const Color(0xFFFFF3F0),
@@ -89,7 +149,7 @@ class BudgetUsagePage extends StatelessWidget {
                           label: '사용',
                           value: '${won.format(used)}원',
                         ),
-                        const Divider(height: 48, thickness: 1, color: Color(0xFFE5E7EB)),
+                        const Divider(height: 25, thickness: 1, color: Color(0xFFE5E7EB)),
 
                         _infoRow(
                           icon: Icons.savings_outlined,
@@ -98,7 +158,7 @@ class BudgetUsagePage extends StatelessWidget {
                           label: '잔여',
                           value: '${won.format(remaining)}원',
                         ),
-                        const Divider(height: 48, thickness: 1, color: Color(0xFFE5E7EB)),
+                        const Divider(height: 25, thickness: 1, color: Color(0xFFE5E7EB)),
 
                         _infoRow(
                           icon: Icons.percent,
@@ -114,7 +174,7 @@ class BudgetUsagePage extends StatelessWidget {
               ),
             ),
 
-            const SizedBox(height: 46),
+            const SizedBox(height: 20),
 
             // 경고/안내 배너
             Container(
@@ -125,17 +185,22 @@ class BudgetUsagePage extends StatelessWidget {
                 border: Border.all(color: danger ? const Color(0xFFF4B4B4) : const Color(0xFFA7F3D0)),
                 borderRadius: BorderRadius.zero,
               ),
-              child: Row(children: [
-                Icon(danger ? Icons.warning_amber_rounded : Icons.check_circle_outline,
-                    size: 20, color: danger ? const Color(0xFFDC2626) : const Color(0xFF059669)),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    danger ? '주의! 예산의 80% 이상을 사용했습니다.' : '좋아요! 아직 예산에 여유가 있어요.',
-                    style: const TextStyle(fontSize: 13.5),
+              child: Row(
+                children: [
+                  Icon(
+                    danger ? Icons.warning_amber_rounded : Icons.check_circle_outline,
+                    size: 20,
+                    color: danger ? const Color(0xFFDC2626) : const Color(0xFF059669),
                   ),
-                ),
-              ]),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      danger ? '주의! 예산의 80% 이상을 사용했습니다.' : '좋아요! 아직 예산에 여유가 있어요.',
+                      style: const TextStyle(fontSize: 13.5),
+                    ),
+                  ),
+                ],
+              ),
             ),
 
             const Spacer(),
@@ -158,7 +223,6 @@ class BudgetUsagePage extends StatelessWidget {
     );
   }
 
-  // 라인 아이템(아이콘 + 라벨 + 값, 귀엽게)
   Widget _infoRow({
     required IconData icon,
     required Color iconBg,
@@ -168,18 +232,15 @@ class BudgetUsagePage extends StatelessWidget {
   }) {
     return Row(
       children: [
-        // 아이콘 배지
         Container(
-          width: 34, height: 34,
+          width: 34,
+          height: 34,
           decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(10)),
           alignment: Alignment.center,
           child: Icon(icon, color: iconColor, size: 18),
         ),
         const SizedBox(width: 10),
-        // 라벨
-        Expanded(
-          child: Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
-        ),
+        Expanded(child: Text(label, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600))),
         Text(
           value,
           maxLines: 1,
@@ -191,7 +252,6 @@ class BudgetUsagePage extends StatelessWidget {
   }
 }
 
-// 반원 게이지 페인터
 class _PrettySemiGaugePainter extends CustomPainter {
   final double progress;
   final Gradient gradient;

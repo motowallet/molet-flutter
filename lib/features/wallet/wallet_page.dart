@@ -6,38 +6,41 @@ import 'request_page.dart';
 import 'transfer_page.dart';
 import 'transaction_list_page.dart';
 import 'card_container.dart';
+import 'wallet_service.dart';
 
 class WalletPage extends StatefulWidget {
-  const WalletPage({super.key});
+  const WalletPage({super.key, this.displayName});
+  final String? displayName;
+
   @override
   State<WalletPage> createState() => _WalletPageState();
 }
 
 class _WalletPageState extends State<WalletPage> {
-  String _filter = 'all'; // all|payment|deposit|withdraw
+  String _filter = 'all'; // all | payment | deposit | withdraw
   final _won = NumberFormat('#,###');
-
   final _friendSearch = TextEditingController();
 
-  // TODO: 서버 연동
+  // TODO: 서버 연동(지갑 주소)
   final _address = '0xA1b2...9F';
-  int _balance = 9876543;
 
-  final List<Map<String, dynamic>> _allTx = [
-    {'title': '주차', 'type': 'payment',  'amount': -1500, 'createdAt': '2025-08-01'},
-    {'title': '입금', 'type': 'deposit',  'amount': 30000, 'createdAt': '2025-08-01'},
-    {'title': '출금', 'type': 'withdraw', 'amount': -5000, 'createdAt': '2025-07-31'},
-  ];
-
-  List<Map<String, dynamic>> get _filteredTx =>
-      _allTx.where((e) => _filter == 'all' ? true : e['type'] == _filter).toList();
+  @override
+  void dispose() {
+    _friendSearch.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final profileName =
+    (widget.displayName?.trim().isEmpty ?? true) ? '사용자' : widget.displayName!.trim();
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Wallet')),
+      appBar: AppBar(
+        title: const Text('Wallet'),
+      ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
             children: [
@@ -45,13 +48,17 @@ class _WalletPageState extends State<WalletPage> {
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
                 child: Column(
-                  children: const [
-                    Icon(Icons.person_outline, size: 72, color: Colors.black87),
-                    SizedBox(height: 4),
-                    Text('이바보', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+                  children: [
+                    const Icon(Icons.person_outline, size: 72, color: Colors.black87),
+                    const SizedBox(height: 4),
+                    Text(
+                      profileName,
+                      style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+                    ),
                   ],
                 ),
               ),
+
               // 친구 찾기
               TextField(
                 controller: _friendSearch,
@@ -73,7 +80,10 @@ class _WalletPageState extends State<WalletPage> {
                             ? 'A'
                             : _friendSearch.text.trim()[0])
                             .toUpperCase(),
-                        style: const TextStyle(fontWeight: FontWeight.w800, color: Colors.black87),
+                        style: const TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: Colors.black87,
+                        ),
                       ),
                     ),
                   ),
@@ -100,9 +110,12 @@ class _WalletPageState extends State<WalletPage> {
                         ],
                       ),
                     ),
-                    Text(
-                      '${_won.format(_balance)}원',
-                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                    ValueListenableBuilder<int>(
+                      valueListenable: WalletService.balanceVN,
+                      builder: (_, bal, __) => Text(
+                        '${_won.format(bal)}원',
+                        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                      ),
                     ),
                   ],
                 ),
@@ -121,16 +134,7 @@ class _WalletPageState extends State<WalletPage> {
                         if (res != null && res['event'] == 'transfer_completed') {
                           final amount = res['amount'] as int;
                           final toName = res['toName'] as String;
-                          final date   = res['date'] as String;
-                          setState(() {
-                            _balance -= amount;
-                            _allTx.insert(0, {
-                              'title': toName,
-                              'type': 'payment',
-                              'amount': -amount,
-                              'createdAt': date,
-                            });
-                          });
+                          await WalletService.transfer(amount, toName: toName);
                         }
                       },
                       icon: const Icon(Icons.send_rounded),
@@ -160,7 +164,7 @@ class _WalletPageState extends State<WalletPage> {
                   scrollDirection: Axis.horizontal,
                   children: [
                     _chip('전체', 'all'),
-                    _chip('결제', 'payment'),
+                    _chip('송금', 'payment'),
                     _chip('입금', 'deposit'),
                     _chip('출금', 'withdraw'),
                   ],
@@ -168,58 +172,85 @@ class _WalletPageState extends State<WalletPage> {
               ),
               const SizedBox(height: 8),
 
-              // 요약 리스트 + + 버튼
-              Expanded(
-                child: CardContainer(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Row(
-                        children: [
-                          const Text('전체 내역', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-                          const Spacer(),
-                          IconButton(
-                            tooltip: '전체 화면으로 보기',
-                            icon: const Icon(Icons.add),
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => TransactionListPage(
-                                    allTx: _allTx,
-                                    initialFilter: _filter,
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                      const Divider(height: 1),
-                      Expanded(
-                        child: ListView.separated(
-                          itemCount: _filteredTx.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
-                          itemBuilder: (_, i) {
-                            final it = _filteredTx[i];
-                            final amt = it['amount'] as int;
-                            return ListTile(
-                              dense: true,
-                              title: Text(it['title'] as String),
-                              subtitle: Text(it['createdAt'] as String),
-                              trailing: Text(
-                                '${amt < 0 ? '-' : '+'}${_won.format(amt.abs())}원',
-                                style: TextStyle(
-                                  fontWeight: FontWeight.w700,
-                                  color: amt < 0 ? Colors.redAccent : Colors.green,
-                                ),
+              // 요약 리스트
+              CardContainer(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      children: [
+                        const Text('전체 내역',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+                        const Spacer(),
+                        IconButton(
+                          tooltip: '전체 화면으로 보기',
+                          icon: const Icon(Icons.add),
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const TransactionListPage(),
                               ),
                             );
                           },
                         ),
-                      ),
-                    ],
-                  ),
+                      ],
+                    ),
+                    const Divider(height: 1),
+
+                    ValueListenableBuilder<List<Map<String, dynamic>>>(
+                      valueListenable: WalletService.txVN,
+                      builder: (_, txs, __) {
+                        final items = txs.where((e) {
+                          final t = (e['type'] ?? '').toString();
+                          return _filter == 'all' ? true : t == _filter;
+                        }).toList()
+                          ..sort((a, b) {
+                            final da = (a['createdAt'] ?? '').toString();
+                            final db = (b['createdAt'] ?? '').toString();
+                            return db.compareTo(da);
+                          });
+                        final summary = items.take(5).toList();
+
+                        if (summary.isEmpty) {
+                          return const Padding(
+                            padding: EdgeInsets.all(24),
+                            child: Center(
+                              child: Text('내역이 없습니다', style: TextStyle(color: Colors.black54)),
+                            ),
+                          );
+                        }
+
+                        return ListView.separated(
+                          physics: const NeverScrollableScrollPhysics(),
+                          shrinkWrap: true,
+                          itemCount: summary.length,
+                          separatorBuilder: (_, __) => const Divider(height: 1),
+                          itemBuilder: (_, i) {
+                            final it = summary[i];
+                            final title = (it['title'] ?? '').toString();
+                            final date = (it['createdAt'] ?? '').toString();
+                            final type = (it['type'] ?? '').toString();
+                            final num rawAmt = (it['amount'] is num) ? it['amount'] as num : 0;
+                            final amt = rawAmt.toInt();
+                            final isIncome = type == 'deposit';
+                            final color = isIncome ? Colors.green : Colors.redAccent;
+
+                            return ListTile(
+                              dense: true,
+                              title: Text(title.isEmpty ? '(제목 없음)' : title),
+                              subtitle: Text(date),
+                              trailing: Text(
+                                '${amt < 0 ? '-' : '+'}${_won.format(amt.abs())}원',
+                                style:
+                                TextStyle(fontWeight: FontWeight.w700, color: color),
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ],
                 ),
               ),
             ],

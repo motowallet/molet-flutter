@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import '../wallet/wallet_page.dart';
 import '../budget/budget_main_page.dart';
+import 'home_page.dart';
+import '../mobility/mobility_main_page.dart';
+import '../settings/settings_main_page.dart';
 
-// 각 탭의 더미 화면
 class _Stub extends StatelessWidget {
   final String title;
   const _Stub(this.title, {super.key});
@@ -12,24 +14,27 @@ class _Stub extends StatelessWidget {
 }
 
 class HomeShell extends StatefulWidget {
-  const HomeShell({super.key});
+  const HomeShell({super.key, this.displayName});
+  final String? displayName; // ← 추가
+
   @override
   State<HomeShell> createState() => _HomeShellState();
 }
 
 class _HomeShellState extends State<HomeShell> {
   int _index = 0;
-  int _unread = 3; // 임시: 안 읽은 알림 수(뱃지)
+  int _unread = 3;
 
-  final _pages = const [
-    _Stub('home페이지'),
-    WalletPage(),
-    BudgetMainPage(),
-    _Stub('설정 페이지'),
-    _Stub('모빌리티 페이지'),
+  // ← const 리스트 대신 게터로 변경 (displayName 전달)
+  List<Widget> get _pages => [
+    HomePage(displayName: widget.displayName),
+    WalletPage(displayName: widget.displayName),
+    const BudgetPage(),
+    const SettingsMainPage(),
+    const MobilityMainPage(),
   ];
 
-  bool get _useShellAppBar => _index != 1; // 지갑 탭(1)일 땐 Shell AppBar 숨김
+  bool get _useShellAppBar => _index != 1;
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +43,6 @@ class _HomeShellState extends State<HomeShell> {
           ? AppBar(
         title: Text(_titleForIndex(_index)),
         actions: [
-          // 간단 뱃지(패키지 없이 Stack)
           Padding(
             padding: const EdgeInsets.only(right: 8),
             child: InkWell(
@@ -48,7 +52,6 @@ class _HomeShellState extends State<HomeShell> {
                   context,
                   MaterialPageRoute(builder: (_) => const _NotificationPage()),
                 );
-                // 돌아오면 읽음 처리했다고 가정
                 setState(() => _unread = 0);
               },
               child: Stack(
@@ -81,7 +84,7 @@ class _HomeShellState extends State<HomeShell> {
         ],
       )
           : null,
-      body: IndexedStack(index: _index, children: _pages), // 탭 상태 유지
+      body: IndexedStack(index: _index, children: _pages),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
@@ -108,12 +111,10 @@ class _HomeShellState extends State<HomeShell> {
   }
 }
 
-//알림페이지
 class _NotificationPage extends StatelessWidget {
   const _NotificationPage({super.key});
   @override
   Widget build(BuildContext context) {
-    // TODO: /api/notifications 목록 불러와서 리스트로 렌더링
     return Scaffold(
       appBar: AppBar(title: const Text('알림')),
       body: ListView.separated(
@@ -122,7 +123,7 @@ class _NotificationPage extends StatelessWidget {
           leading: const Icon(Icons.notifications),
           title: Text('알림 ${i + 1}'),
           subtitle: const Text('여기에 알림 내용을 표시합니다.'),
-          onTap: () {}, // 상세로 이동 등
+          onTap: () {},
         ),
         separatorBuilder: (_, __) => const Divider(height: 1),
         itemCount: 10,

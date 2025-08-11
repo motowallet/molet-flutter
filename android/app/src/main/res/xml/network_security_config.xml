@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- 카카오맵 리소스: 여러 서브도메인(t1, map*, etc.)에서 불러옴 -->
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">daumcdn.net</domain>
+    </domain-config>
+</network-security-config>

@@ -4,6 +4,7 @@ import 'package:kakao_flutter_sdk_user/kakao_flutter_sdk_user.dart';
 import 'package:kakao_map_plugin/kakao_map_plugin.dart';
 import 'features/home/home_shell.dart';
 import 'features/wallet/wallet_service.dart';
+import 'features/wallet/wallet_gate.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -81,9 +82,8 @@ class _LoginPageState extends State<LoginPage> {
       });
 
       // TODO: 백엔드에 token.accessToken 전달해 JWT 발급/저장
-
       Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => HomeShell(displayName: nick)),
+        MaterialPageRoute(builder: (_) => WalletGate(displayName: nick)),
       );
     } catch (e) {
       if (!mounted) return;

@@ -42,10 +42,11 @@ dependencies:
   kakao_flutter_sdk_user: ^1.9.7+3
   intl: ^0.20.2
   kakao_map_plugin: ^0.3.7
-  flutter_secure_storage: 9.2.4
+  flutter_secure_storage: ^9.2.4
   mobile_scanner: ^7.0.1
-  web_socket_channel: ^2.4.0
-  fl_chart: ^0.69.0
+  web_socket_channel: ^3.0.3
+  fl_chart: ^1.0.0
+
 
 dev_dependencies:
   flutter_test:

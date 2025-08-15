@@ -44,7 +44,7 @@ class _TransactionListPageState extends State<TransactionListPage> {
                 ),
               ),
             ),
-            const Divider(height: 1)
+            const Divider(height: 1),
 
             Expanded(
               child: ValueListenableBuilder<List<Map<String, dynamic>>>(

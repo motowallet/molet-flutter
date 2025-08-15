@@ -11,6 +11,7 @@ class WalletService {
     final n = d ?? DateTime.now();
     return '${n.year}${n.month.toString().padLeft(2, '0')}';
   }
+
   static String get _usedKey => 'budget_used_${_ym()}';
 
   // 앱 전체 공유 상태
@@ -20,6 +21,7 @@ class WalletService {
 
   static bool _loaded = false;
 
+  /// 앱 시작 시 지갑/거래내역 로드
   static Future<void> init() async {
     if (_loaded) return;
     final sp = await SharedPreferences.getInstance();
@@ -36,6 +38,28 @@ class WalletService {
       } catch (_) {}
     }
     _loaded = true;
+  }
+
+  /// 지갑 존재 여부
+  static Future<bool> exists() async {
+    final sp = await SharedPreferences.getInstance();
+    return sp.containsKey(_kBalance);
+  }
+
+  /// 지갑 생성(초기화)
+  static Future<void> createWallet({int initialBalance = 100000}) async {
+    final sp = await SharedPreferences.getInstance();
+
+    // 상태 초기화
+    balanceVN.value = initialBalance;
+    txVN.value = const [];
+
+    // 저장
+    await sp.setInt(_kBalance, balanceVN.value);
+    await sp.remove(_kTx);
+    await sp.remove(_usedKey); // 이번 달 사용액 리셋
+
+    _loaded = true; // 이후 init()이 중복 로드하지 않도록
   }
 
   static Future<int> balance() async {
@@ -88,14 +112,14 @@ class WalletService {
   static Future<void> deposit(
       int amount, {
         String title = '입금',
-        String category = 'DEPOSIT', // ← 추가
+        String category = 'DEPOSIT',
       }) async {
     await init();
     balanceVN.value += amount;
     _addTx({
       'title': title,
       'type': 'deposit',
-      'category': category, // ← 이제 정상
+      'category': category,
       'amount': amount,
       'createdAt': DateTime.now().toIso8601String().substring(0, 10),
     });
@@ -106,7 +130,7 @@ class WalletService {
   static Future<bool> transfer(
       int amount, {
         required String toName,
-        String category = 'TRANSFER', // ← 추가
+        String category = 'TRANSFER',
       }) async {
     await init();
     if (balanceVN.value < amount) return false;
@@ -115,7 +139,7 @@ class WalletService {
     _addTx({
       'title': toName,
       'type': 'payment',
-      'category': category, // ← 카테고리 기록
+      'category': category,
       'amount': -amount,
       'createdAt': DateTime.now().toIso8601String().substring(0, 10),
     });

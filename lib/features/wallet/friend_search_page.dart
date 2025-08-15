@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'request_page.dart';
 import 'transfer_page.dart';
+import '../home/home_shell.dart';
 
 class FriendSearchPage extends StatefulWidget {
   final String initialQuery;
